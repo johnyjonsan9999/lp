@@ -1,0 +1,32 @@
+
+import re
+from gensim.models import Word2Vec
+
+text = """Machine learning is a part of artificial intelligence.
+Deep learning uses neural networks.
+Word embeddings represent words as vectors.
+Machine learning helps computers learn from data."""
+
+text = re.sub(r"[^a-zA-Z\s]", "", text)
+
+words = text.lower().split()
+sentences = [words]
+
+model = Word2Vec(
+    sentences,
+    vector_size=50,
+    window=2,
+    min_count=1,
+    sg=0,
+    epochs=100
+)
+
+word = "learning"
+
+print("Word Embedding:")
+print(model.wv[word])
+
+print("\nSimilar Words:")
+print(model.wv.most_similar(word, topn=5))
+
+print("\nVocabulary Size:", len(model.wv))
