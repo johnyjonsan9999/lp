@@ -1,0 +1,108 @@
+
+# 1. Import libraries
+import tensorflow as tf
+import numpy as np
+import matplotlib.pyplot as plt
+
+from tensorflow.keras.applications import MobileNetV2
+from tensorflow.keras.layers import Dense, GlobalAveragePooling2D, Input
+from tensorflow.keras.models import Model
+
+# 2. Load Fashion MNIST dataset
+(X_train, y_train), (X_test, y_test) = tf.keras.datasets.fashion_mnist.load_data()
+
+# 3. Preprocess data
+# Convert grayscale to RGB
+X_train = np.stack([X_train]*3, axis=-1)
+X_test = np.stack([X_test]*3, axis=-1)
+
+# Resize images to 96x96
+X_train = tf.image.resize(X_train, (96, 96))
+X_test = tf.image.resize(X_test, (96, 96))
+
+# Convert to MobileNetV2 input format
+X_train = tf.keras.applications.mobilenet_v2.preprocess_input(X_train)
+X_test = tf.keras.applications.mobilenet_v2.preprocess_input(X_test)
+
+# 4. Load pretrained MobileNetV2
+base_model = MobileNetV2(
+    weights='imagenet',
+    include_top=False,
+    input_shape=(96, 96, 3)
+)
+
+# 5. Freeze base model layers
+base_model.trainable = False
+
+# 6. Add custom classification layers
+inputs = Input(shape=(96, 96, 3))
+x = base_model(inputs, training=False)
+x = GlobalAveragePooling2D()(x)
+x = Dense(128, activation='relu')(x)
+outputs = Dense(10, activation='softmax')(x)
+
+model = Model(inputs, outputs)
+
+# 7. Compile model
+model.compile(
+    optimizer='adam',
+    loss='sparse_categorical_crossentropy',
+    metrics=['accuracy']
+)
+
+# 8. Train model
+history = model.fit(
+    X_train, y_train,
+    epochs=3,
+    batch_size=64,
+    validation_split=0.2
+)
+
+# 9. Compute loss and evaluate model
+loss, accuracy = model.evaluate(X_test, y_test)
+
+print("Test Loss:", loss)
+print("Test Accuracy:", accuracy)
+
+# 10. Fine-tuning
+base_model.trainable = True
+
+# Freeze all except last 20 layers
+for layer in base_model.layers[:-20]:
+    layer.trainable = False
+
+model.compile(
+    optimizer=tf.keras.optimizers.Adam(learning_rate=0.00001),
+    loss='sparse_categorical_crossentropy',
+    metrics=['accuracy']
+)
+
+# Train again
+model.fit(
+    X_train, y_train,
+    epochs=2,
+    batch_size=64,
+    validation_split=0.2
+)
+
+# 11. Visualize predictions
+class_names = [
+    'T-shirt', 'Trouser', 'Pullover', 'Dress', 'Coat',
+    'Sandal', 'Shirt', 'Sneaker', 'Bag', 'Ankle boot'
+]
+
+predictions = model.predict(X_test[:10])
+
+plt.figure(figsize=(12, 5))
+
+for i in range(10):
+    plt.subplot(2, 5, i+1)
+
+    plt.imshow(X_test[i] / 2 + 0.5)
+    predicted = np.argmax(predictions[i])
+
+    plt.title(class_names[predicted])
+    plt.axis('off')
+
+plt.tight_layout()
+plt.show()
